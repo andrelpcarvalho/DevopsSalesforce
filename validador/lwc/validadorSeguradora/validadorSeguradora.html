@@ -1,0 +1,86 @@
+<template>
+    <template if:true={loading}>
+        <lightning-spinner size="medium" variant="base" alternative-text="Loading"></lightning-spinner>
+    </template>
+    <lightning-card>
+        <div class="slds-card">
+            <lightning-tabset>
+                <lightning-tab label="Dados Bancários">
+                    <div class="slds-grid slds-size_1-of-1 slds-m-left_x-small">
+                        <span><strong><h2>Dados para Pagamento</h2></strong></span>
+                    </div>
+                    <div class="slds-grid slds-size_2-of-3">
+                        <div class="slds-col slds-size_1-of-3 slds-p-around_x-small">
+                            <lightning-radio-group  id="iDTipoConta" name="accountType" class="slds-m-left_x-small checkbox-radio-horizontal_align form" label="Tipo de conta" options={contaOptions} onchange={defineValues} type="radio" required="true"></lightning-radio-group>
+                        </div>
+                        <div class="slds-m-around_x-small slds-size_1-of-5">
+
+                            <lightning-input
+                                data-banks
+                                name="bank"
+                                type="search"
+                                label="Banco"
+                                placeholder="Pesquisar..."
+                                onchange={handleSearch}
+                                value={selectedBank}
+                                title={selectedBank}
+                                message-when-bad-input="Informe um valor válido."
+                                field-level-help="Para visualizar a lista completa, insira o valor '%'."
+                                is-loading={loadingBanks}
+                                required="true"
+                                message-when-value-missing="Campo obrigatório!"
+                                data-field="banco"
+                                class="form"></lightning-input>
+
+                            <template if:true={openBankSelection}>
+                                <div class="slds-dropdown slds-dropdown_length-5 slds-dropdown_fluid slds-is-relative" role="listbox">
+                                    <ul class="slds-listbox slds-listbox_vertical" role="presentation">
+                                        <template for:each={filteredBanks} for:item="item" for:index="index">
+                                            <li key={item.identificador} class="slds-listbox__item" role="presentation">
+                                                <div data-index={index} class="slds-media slds-listbox__option slds-listbox__option_entity slds-listbox__option_has-meta" title={item.nameFmt} onclick={handleSelectClick}>
+                                                    {item.nameFmt}
+                                                </div>
+                                            </li>
+                                        </template>
+                                        <template if:true={noRecordFound}>
+                                            Nenhum
+                                            registro
+                                            encontrado.
+                                        </template>
+                                    </ul>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="slds-m-around_x-small slds-size_1-of-5">
+                            <lightning-input name="agency" type="text" label="Agência" pattern = "[0-9]+" maxlength="5" value={agencia} required="true" message-when-pattern-mismatch="Apenas números são válidos" message-when-value-missing="Campo obrigatório!" data-field="agencia" onchange={defineValues}></lightning-input>
+                        </div>
+                        <div class="slds-m-around_x-small slds-size_1-of-12">
+                            <lightning-input name="agencyDigit" type="text" label="Dígito" pattern = "[0-9]+" maxlength="1" value={digitoAgencia} message-when-pattern-mismatch="Apenas números são válidos" data-field="digitoAgencia" onchange={defineValues}></lightning-input>
+                        </div>
+                        <div class="slds-m-around_x-small slds-size_1-of-5">
+                            <lightning-input name="accountNumber" type="text" label="Conta" pattern = "[0-9]+" value={conta} required="true" message-when-value-missing="Campo obrigatório!" message-when-pattern-mismatch="Apenas números são válidos" data-field="conta" onchange={defineValues}></lightning-input>
+                        </div>
+                        <div class="slds-m-around_x-small slds-size_1-of-12">
+                            <lightning-input name="accountDigit" type="text" label="Dígito" pattern = "[0-9]+" maxlength="1" value={digitoConta} required="true" message-when-value-missing="Campo obrigatório!" message-when-pattern-mismatch="Apenas números são válidos" data-field="digitoConta" onchange={defineValues}></lightning-input>
+                        </div>
+                    </div>
+
+                    <div class="slds-grid slds-grid_align-end slds-p-around_xx-small">
+                        <div class="slds-col">
+                        <template if:true={enableconfirmbutton}>
+                          <lightning-button variant="brand" label={firstbuttonlabel} onclick={validateForm}></lightning-button>
+                        </template>
+                        <template if:true={enablesecondbutton}>
+                          <lightning-button variant="neutral" label={secondbuttonlabel} onclick={secondButton}></lightning-button>
+                        </template>
+                        <template if:true={enablebackbutton}>
+                          <lightning-button variant="neutral" label={backbuttonlabel} title="Voltar" onclick={backStep}></lightning-button>
+                        </template>
+                        </div>
+                    </div>
+                </lightning-tab>
+            </lightning-tabset>
+        </div>
+    </lightning-card>
+</template>
