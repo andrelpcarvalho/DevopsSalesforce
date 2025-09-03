@@ -2,48 +2,36 @@
 #UAT export COMMIT_HASH="cf9e952f0b411b1668c345662c04068a3a3494aa"
 
 #Caminho da pasta build
-BUILD_DIR="\Users\andre.carvalho\Documents\BANCO_BV_Workspace_TESTES\build"
+#BUILD_DIR="\Users\andre.carvalho\Documents\BANCO_BV_Workspace_TESTES\build"
+FULL_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(echo "$FULL_PATH" | sed -E 's|(.*workspace_bash).*|\1|')"
+echo "SCRIPT_DIR : $PROJECT_DIR"
 
-DESTRUCTIVE_BUILD_DIR="\Users\andre.carvalho\Documents\BANCO_BV_Workspace_TESTES\destructive_build"
+project_name="build_deploy"
+
+sf project generate --name $project_name --output-dir $PROJECT_DIR
+
+BUILD_DIR="${PROJECT_DIR}${project_name}\\"
+
 #Caminho da pasta onde estão os arquivo que serão copiados
-LOCAL_DIR="\Users\andre.carvalho\Documents\BANCO_BV_Workspace_TESTES\testeBash"
+LOCAL_DIR="$(echo "$FULL_PATH" | sed -E 's|(.*teste_bash).*|\1|')"
+echo "LOCAL_DIR : $LOCAL_DIR"
 
-: << 'EOF'
 #Commmit baseline USAR pra Release esse trecho
-COMMIT_HASH=$(<\\Users\\andre.carvalho\\Documents\\BANCO_BV_Workspace_TESTES\\testeBash\\bash\\salesforce-build\\baseline.txt)
+if [[ -f "$FULL_PATH/baseline.txt" ]]; then
+    COMMIT_HASH=$(<"$FULL_PATH/baseline.txt")
+else
+    echo "Arquivo baseline.txt não encontrado!"
+    exit 1
+fi
+
+#COMMIT_HASH=$(<\\Users\\andre.carvalho\\Documents\\workspace_bash\\teste_bash\\bash\\salesforce-build\\baseline.txt)
 echo "Baseline : $COMMIT_HASH"
-branch="release-v3.0.0"
-EOF
-
-#Branch de referência e atualização local
-branch="backupUat"
-export COMMIT_HASH="9e1cad64c8c105d2dd15f15eeb3ed1c9b185a119"
-
+branch="release-v4.0.0"
 
 #Selecionando a branch pra fazer o diff
 echo "Checkout to $branch"
 git checkout $branch; # <HEAD>
-
-#Trecho para criação das tags
-: << 'EOF'
-# Obtém a última tag
-LAST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1))
-
-# Se não houver tags, começa com v1.0.0
-if [ -z "$LAST_TAG" ]; then
-  NEW_TAG="v1.0.0"
-else
-  # Incrementa a versão
-  IFS='.' read -r -a VERSION_PARTS <<< "${LAST_TAG//v/}"
-  MAJOR=${VERSION_PARTS[0]}
-  MINOR=${VERSION_PARTS[1]}
-  PATCH=${VERSION_PARTS[2]}
-  PATCH=$((PATCH + 1))
-  NEW_TAG="v$MAJOR.$MINOR.$PATCH"
-fi
-
-git tag -a "$NEW_TAG" -m "New tag: $NEW_TAG" $COMMIT_HASH
-EOF
 
 #Atualizando as branchs com fetch
 echo "git fetch"
@@ -61,9 +49,6 @@ git rev-list $COMMIT_HASH..HEAD --oneline > commitlist.txt;
 #Limpa a pasta build se existir e se não existir cria uma nova pasta build
 rm -rf $BUILD_DIR;
 mkdir $BUILD_DIR;
-
-rm -rf $DESTRUCTIVE_BUILD_DIR;
-mkdir $DESTRUCTIVE_BUILD_DIR;
 
 # Verifica se as variáveis COMMIT_HASH e BUILD_DIR estão definidas
 if [ -z "$COMMIT_HASH" ] || [ -z "$BUILD_DIR" ]; then
@@ -178,15 +163,6 @@ substring_component_aura="/aura/"
 substring_component_lwc="/lwc/"
 substring_layout="/layouts/"
 
-: << 'EOF'
-while IFS= read -r file; do 
-
-    if [[ $file == *"$substring_layout"* ]]; then
-        echo "arquivo cru sem aspas $file"
-    fi
-done < arquivos_modificados.txt
-EOF
-
 rm lista_arquivos_naodeletados.txt
 rm lista_arquivos_adicionados.txt
 rm lista_arquivos_modificados.txt
@@ -216,7 +192,7 @@ while IFS= read -r file; do
         cleaned_file=$(clean_file "$file" ) 
     fi    
     
-    if [[ $cleaned_file == *.cls ]]; then
+    if [[ $cleaned_file == *.cls || $cleaned_file == *.trigger ]]; then
         copy_class_meta "$cleaned_file" "$BUILD_DIR"
     elif [[ $cleaned_file == *"$substring_component_aura"* ||  $cleaned_file == *"$substring_component_lwc"* ]]; then
         copy_components_path "$cleaned_file" "$BUILD_DIR"
@@ -236,47 +212,14 @@ while IFS= read -r file; do
 done < lista_arquivos_naodeletados.txt
 #EOF
 
-: << 'EOF'
-echo "Arquivos Deletados"
-while IFS= read -r file; do
-        
-    rm arquivos_com_aspas.txt;
-    echo "\"$file\"" >> arquivos_com_aspas.txt
-    cleaned_file=$file
-    echo "Arquivo deletado a ser avaliado : $cleaned_file"
-    if [[ "$file" == *"$substring"* ]]; then
-        cleaned_file=$(clean_file "$file" ) 
-    fi    
-    
-    if [[ $cleaned_file == *.cls ]]; then
-        copy_class_meta "$cleaned_file" "$DESTRUCTIVE_BUILD_DIR"
-    elif [[ $cleaned_file == *"$substring_component_aura"* ||  $cleaned_file == *"$substring_component_lwc"* ]]; then
-        copy_components_path "$cleaned_file" "$DESTRUCTIVE_BUILD_DIR"
-    elif [[ "$cleaned_file" == *"$substring_experiences"* ]]; then
-        copy_extension_file_path "$cleaned_file" "$DESTRUCTIVE_BUILD_DIR"
-    else
-        # Cria o diretório se não existir
-        mkdir -p "$DESTRUCTIVE_BUILD_DIR/$(dirname "$cleaned_file")"
-        echo "Vai copiar daqui $LOCAL_DIR/$cleaned_file "
-        echo "Para esse lugar $DESTRUCTIVE_BUILD_DIR/$cleaned_file"
-        # Copia o arquivo da pasta local para a pasta de build
-        cp "$LOCAL_DIR/$cleaned_file" "$DESTRUCTIVE_BUILD_DIR/$cleaned_file"
-    fi
-    # Adiciona o nome do arquivo ao arquivo de lista
-    rm modified_files_without_special_chars.txt;
-    echo "$cleaned_file" >> modified_files_without_special_chars.txt
-
-done < lista_arquivos_deletados.txt
-EOF
-
 #Branch e hash do head
-hash_commit=$(git rev-parse HEAD)
-echo "hash da head $hash_commit"
+hash_atual_commit=$(git rev-parse HEAD)
+echo "hash atual da head : $hash_atual_commit"
 
 rm baseline.txt;
-echo "$hash_commit" >> baseline.txt
+echo "$hash_atual_commit" >> baseline.txt
 
 commit_branch=$(git branch)
-echo "commit branch $commit_branch"
+echo -e "commit branch\n\n$commit_branch"
 
 echo "Build project criado em $BUILD_DIR."
