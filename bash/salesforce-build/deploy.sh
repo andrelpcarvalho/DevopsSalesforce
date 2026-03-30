@@ -45,34 +45,21 @@ if [[ $? -ne 0 ]]; then
     rollback "geradorPackage.sh (exit code diferente de 0)"
 fi
 
-# ── ETAPA 3: Deploy em Training (síncrono, aguarda resultado) ──
+# ── ETAPA 3: Dispara Training em background (não bloqueia PRD) ──
 echo ""
-echo "==> [3/4] Deploy em Training..."
-bash "$treino"
-TREINO_EXIT=$?
+echo "==> [3/4] Disparando deploy em Training (paralelo ao PRD)..."
+bash "$treino" &
+TREINO_PID=$!
+echo "[INFO] Training rodando em background (PID: $TREINO_PID)"
 
-# Aguarda processo terminar caso ainda esteja rodando em background
-wait
-
-if [[ $TREINO_EXIT -ne 0 ]]; then
-    rollback "deployTraining.sh (exit code diferente de 0)"
-fi
-
-# Verifica o log de training por erros
-if grep -qiE "error|failed|exception|deploy failed" "$FULL_PATH/deploy_training_output.log" 2>/dev/null; then
-    echo "[ERRO] Erros detectados no deploy_training_output.log:"
-    grep -iE "error|failed|exception|deploy failed" "$FULL_PATH/deploy_training_output.log" | head -20
-    rollback "deployTraining (erros encontrados no log)"
-fi
-echo "[OK] Deploy em Training concluído sem erros."
-
-# ── ETAPA 4: Validate em PRD (síncrono, aguarda resultado) ──
+# ── ETAPA 4: Deploy/Validate em PRD (síncrono, é ele quem decide o pipeline) ──
 echo ""
 echo "==> [4/4] Validação em PRD..."
 bash "$producao"
 PRD_EXIT=$?
 
-wait
+wait "$TREINO_PID"
+TREINO_EXIT=$?
 
 if [[ $PRD_EXIT -ne 0 ]]; then
     rollback "deployPrd.sh (exit code diferente de 0)"
@@ -86,7 +73,17 @@ if grep -qiE "error|failed|exception|deploy failed" "$FULL_PATH/deploy_prd_outpu
 fi
 echo "[OK] Validação em PRD concluída sem erros."
 
-# ── Só atualiza baseline APÓS tudo ter passado ──
+# ── Verifica resultado do Training (apenas informativo, não aborta) ──
+echo ""
+if [[ $TREINO_EXIT -ne 0 ]]; then
+    echo "[AVISO] Training terminou com exit code $TREINO_EXIT — verifique deploy_training_output.log"
+elif grep -qiE "error|failed|exception|deploy failed" "$FULL_PATH/deploy_training_output.log" 2>/dev/null; then
+    echo "[AVISO] Training concluído mas com erros no log — verifique deploy_training_output.log"
+else
+    echo "[OK] Deploy em Training concluído sem erros."
+fi
+
+# ── Só atualiza baseline APÓS PRD ter passado ──
 echo "$NOVO_BASELINE" > "$FULL_PATH/baseline.txt"
 echo "[INFO] baseline.txt atualizado para: $NOVO_BASELINE"
 
