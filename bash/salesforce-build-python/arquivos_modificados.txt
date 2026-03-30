@@ -1,0 +1,10 @@
+force-app/main/default/approvalProcesses/TouchPoint__c.AprovacaoApuracaoMotorOferta.approvalProcess-meta.xml
+force-app/main/default/classes/AnnuityDiscountBuilder.cls
+force-app/main/default/classes/AnnuityDiscountViewModel.cls
+force-app/main/default/flexipages/TouchPointWFInteraction.flexipage-meta.xml
+force-app/main/default/lwc/annuityDiscount/annuityDiscount.html
+force-app/main/default/lwc/annuityDiscount/annuityDiscount.js
+force-app/main/default/objects/TouchPoint__c/fields/Percentual__c.field-meta.xml
+force-app/main/default/permissionsets/AplicativoMotorOferta.permissionset-meta.xml
+force-app/main/default/permissionsets/MotorOfertaUser.permissionset-meta.xml
+force-app/main/default/permissionsets/WorkflowCampanhaUser.permissionset-meta.xml

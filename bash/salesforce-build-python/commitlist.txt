@@ -1,0 +1,3 @@
+68834f9c2 COESI-1917 Delete Percentual__c
+48239667d SFRERIS-1143 - Bloqueio negociação de anuidade - Ajuste request Simula desconto
+86fda405f COESI-1917 Ajuste campo percentual
