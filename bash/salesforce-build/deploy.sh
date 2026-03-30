@@ -1,26 +1,112 @@
 #!/bin/bash
 FULL_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Caminho para o script que você deseja executar
 build="$FULL_PATH/deployBuild.sh"
 xml="$FULL_PATH/geradorPackage.sh"
 treino="$FULL_PATH/deployTraining.sh"
 producao="$FULL_PATH/deployPrd.sh"
 
-# Executar o script usando bash
-echo "Executar build"
-bash $build
+# ── Verifica que baseline.txt existe antes de qualquer coisa ──
+if [[ ! -f "$FULL_PATH/baseline.txt" ]]; then
+    echo "[ERRO] baseline.txt não encontrado. Abortando."
+    exit 1
+fi
 
-echo "gerar package.xml"
-bash $xml
+# ── Salva o baseline atual para rollback ──
+BASELINE_BACKUP=$(<"$FULL_PATH/baseline.txt")
+echo "[INFO] Baseline salvo para rollback: $BASELINE_BACKUP"
 
-echo "Deploy em training"
-bash $treino
+# ── Função de rollback: restaura baseline e aborta ──
+rollback() {
+    local etapa="$1"
+    echo ""
+    echo "╔══════════════════════════════════════════════╗"
+    echo "║  ERRO NA ETAPA: $etapa"
+    echo "║  Restaurando baseline.txt → $BASELINE_BACKUP"
+    echo "╚══════════════════════════════════════════════╝"
+    echo "$BASELINE_BACKUP" > "$FULL_PATH/baseline.txt"
+    echo "[INFO] Rollback concluído. Nenhuma alteração foi promovida."
+    exit 1
+}
 
-echo "Terminou deploy em training"
+# ── ETAPA 1: Build ──
+echo ""
+echo "==> [1/4] Executando build..."
+bash "$build"
+if [[ $? -ne 0 ]]; then
+    rollback "deployBuild.sh (exit code diferente de 0)"
+fi
 
-echo "Validação em PRD"
-bash $producao
-echo "Terminou validação em PRD"
+# ── ETAPA 2: Gerar package.xml ──
+echo ""
+echo "==> [2/4] Gerando package.xml..."
+bash "$xml"
+if [[ $? -ne 0 ]]; then
+    rollback "geradorPackage.sh (exit code diferente de 0)"
+fi
 
-echo "Fim da execução"
+# ── ETAPA 3: Deploy em Training (síncrono, aguarda resultado) ──
+echo ""
+echo "==> [3/4] Deploy em Training..."
+bash "$treino"
+TREINO_EXIT=$?
+
+# Aguarda processo terminar caso ainda esteja rodando em background
+wait
+
+if [[ $TREINO_EXIT -ne 0 ]]; then
+    rollback "deployTraining.sh (exit code diferente de 0)"
+fi
+
+# Verifica o log de training por erros
+if grep -qiE "error|failed|exception|deploy failed" "$FULL_PATH/deploy_training_output.log" 2>/dev/null; then
+    echo "[ERRO] Erros detectados no deploy_training_output.log:"
+    grep -iE "error|failed|exception|deploy failed" "$FULL_PATH/deploy_training_output.log" | head -20
+    rollback "deployTraining (erros encontrados no log)"
+fi
+echo "[OK] Deploy em Training concluído sem erros."
+
+# ── ETAPA 4: Validate em PRD (síncrono, aguarda resultado) ──
+echo ""
+echo "==> [4/4] Validação em PRD..."
+bash "$producao"
+PRD_EXIT=$?
+
+wait
+
+if [[ $PRD_EXIT -ne 0 ]]; then
+    rollback "deployPrd.sh (exit code diferente de 0)"
+fi
+
+# Verifica o log de PRD por erros
+if grep -qiE "error|failed|exception|deploy failed" "$FULL_PATH/deploy_prd_output.log" 2>/dev/null; then
+    echo "[ERRO] Erros detectados no deploy_prd_output.log:"
+    grep -iE "error|failed|exception|deploy failed" "$FULL_PATH/deploy_prd_output.log" | head -20
+    rollback "deployPrd validate (erros encontrados no log)"
+fi
+echo "[OK] Validação em PRD concluída sem erros."
+
+# ── Só atualiza baseline APÓS tudo ter passado ──
+echo "$NOVO_BASELINE" > "$FULL_PATH/baseline.txt"
+echo "[INFO] baseline.txt atualizado para: $NOVO_BASELINE"
+
+# ── Extrai Job ID do log de PRD para o quick deploy manual ──
+JOB_ID=$(grep -oE '[0-9A-Za-z]{18}' "$FULL_PATH/deploy_prd_output.log" \
+    | grep -E '^0Af' | head -1)
+
+if [[ -n "$JOB_ID" ]]; then
+    echo "$JOB_ID" > "$FULL_PATH/prd_job_id.txt"
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║  PIPELINE CONCLUÍDO COM SUCESSO                              ║"
+    echo "║  Job ID para quick deploy: $JOB_ID  ║"
+    echo "║  Execute pelo time de PRD: bash quickDeployPrd.sh            ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+else
+    echo ""
+    echo "[AVISO] Job ID não encontrado no log. Verifique deploy_prd_output.log manualmente."
+    echo "[INFO]  Pipeline concluído. Baseline atualizado."
+fi
+
+echo ""
+echo "Fim da execução."
