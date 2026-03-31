@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from config import BASELINE_FILE, BRANCH, BUILD_DIR, PROJECT_DIR, PROJECT_NAME, SCRIPT_DIR
+from config import BASELINE_FILE, BRANCH, BUILD_DIR, PROJECT_DIR, PROJECT_NAME, SCRIPT_DIR , LOCAL_DIR
 
 
 # ── Caracteres especiais (octal → Unicode) ─────────────────────────────────
@@ -27,8 +27,6 @@ SPECIAL_CHARS = {
     r"\\303\\251": "é",
     r"\\303\\265": "õ",
 }
-
-LOCAL_DIR = PROJECT_DIR
 
 
 # ── Utilitários ────────────────────────────────────────────────────────────

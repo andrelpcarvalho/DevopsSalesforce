@@ -32,6 +32,7 @@ def find_project_dir(marker: str = "workspace_bash") -> Path:
 
 SCRIPT_DIR  = Path(__file__).resolve().parent
 PROJECT_DIR = find_project_dir("workspace_bash")
+LOCAL_DIR = PROJECT_DIR / "sforce-sfdc-bvsa-organization"
 
 # ── Nomes e pastas ─────────────────────────────────────────────────────────
 
