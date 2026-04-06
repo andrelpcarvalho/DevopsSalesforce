@@ -25,8 +25,6 @@ def main() -> None:
         "--verbose",
     ]
 
-    log_lines: list[str] = []
-
     with (
         subprocess.Popen(
             cmd,
@@ -39,15 +37,14 @@ def main() -> None:
         for line in proc.stdout:
             print(line, end="")
             log.write(line)
-            log_lines.append(line)
 
     if proc.returncode != 0:
         print(f"[ERRO] Validate em PRD falhou com exit code {proc.returncode}.")
         sys.exit(proc.returncode)
 
-    # Extrai Job ID do log (0Af + 15 chars alfanuméricos = 18 chars total)
+    # Extrai Job ID do arquivo de log — evita acumular linhas em memória.
     job_id: str | None = None
-    for line in log_lines:
+    for line in LOG_PRD.read_text().splitlines():
         match = re.search(r'\b(0Af[0-9A-Za-z]{15})\b', line)
         if match:
             job_id = match.group(1)

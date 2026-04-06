@@ -4,7 +4,6 @@ build_deploy.py
 Etapa 1: build e cópia de arquivos modificados desde o baseline.
 """
 
-import os
 import re
 import shutil
 import subprocess
@@ -128,7 +127,13 @@ def main() -> None:
     print(f"SCRIPT_DIR  : {SCRIPT_DIR}")
     print(f"PROJECT_DIR : {PROJECT_DIR}")
 
-    run(["sf", "project", "generate", "--name", PROJECT_NAME, "--output-dir", str(PROJECT_DIR)])
+    # Gera a estrutura do projeto sf apenas se ainda não existir —
+    # evita recriar desnecessariamente a cada build.
+    sfdx_json = PROJECT_DIR / PROJECT_NAME / "sfdx-project.json"
+    if not sfdx_json.exists():
+        run(["sf", "project", "generate", "--name", PROJECT_NAME, "--output-dir", str(PROJECT_DIR)])
+    else:
+        print(f"[INFO] Estrutura do projeto já existe em {PROJECT_DIR / PROJECT_NAME}, pulando geração.")
 
     if not BASELINE_FILE.exists():
         print("[ERRO] baseline.txt não encontrado!")
@@ -175,10 +180,14 @@ def main() -> None:
     print(f"[INFO] Novo baseline calculado: {novo_baseline}")
     print("[INFO] baseline.txt será atualizado pelo pipeline.py após validate PRD.")
 
-    os.environ["NOVO_BASELINE"] = novo_baseline
+    # Não usamos os.environ para passar o baseline ao pipeline.py —
+    # variáveis de ambiente de subprocessos não sobem para o processo pai.
+    # O pipeline.py lerá o HEAD via git rev-parse diretamente após o PRD passar.
 
-    branch_info = subprocess.run(["git", "branch"], capture_output=True, text=True, check=True).stdout
-    print(f"commit branch\n\n{branch_info}")
+    branch_atual = subprocess.run(
+        ["git", "branch", "--show-current"], capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    print(f"Branches: {branch_atual}")
     print(f"Build project criado em {BUILD_DIR}.")
 
 

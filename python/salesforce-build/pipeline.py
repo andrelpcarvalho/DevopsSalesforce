@@ -5,7 +5,6 @@ Orquestrador principal do pipeline de deploy.
 Chama build → package.xml → training (paralelo) → PRD (síncrono).
 """
 
-import os
 import re
 import subprocess
 import sys
@@ -100,7 +99,9 @@ def main() -> None:
     def run_training() -> None:
         training_exit_code.append(run_script(scripts["training"]))
 
-    training_thread = threading.Thread(target=run_training, daemon=True)
+    # daemon=False garante que o log do training é fechado mesmo se o processo
+    # principal receber Ctrl+C durante a execução do PRD.
+    training_thread = threading.Thread(target=run_training, daemon=False)
     training_thread.start()
     print("[INFO] Training rodando em background (thread iniciada)")
 
@@ -132,15 +133,12 @@ def main() -> None:
         print("[OK] Deploy em Training concluído sem erros.")
 
     # ── Atualiza baseline APÓS PRD passar ──────────────────────────────────
-    # build_deploy.py publica o HEAD calculado em NOVO_BASELINE.
-    # Se a env var não estiver disponível (subprocesso isolado), faz fallback
-    # lendo git rev-parse HEAD diretamente.
-    novo_baseline = os.environ.get("NOVO_BASELINE", "").strip()
-    if not novo_baseline:
-        novo_baseline = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            capture_output=True, text=True, check=True,
-        ).stdout.strip()
+    # Variáveis de ambiente definidas em subprocessos não sobem para o pai.
+    # Lemos o HEAD diretamente via git — é a fonte de verdade.
+    novo_baseline = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
     BASELINE_FILE.write_text(novo_baseline + "\n")
     print(f"[INFO] baseline.txt atualizado para: {novo_baseline}")
 

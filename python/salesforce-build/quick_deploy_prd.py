@@ -12,7 +12,7 @@ import sys
 from config import JOB_ID_FILE, LOG_QUICK_DEPLOY
 
 
-ERROR_PATTERN = re.compile(r"deploy failed|error|exception", re.IGNORECASE)
+ERROR_PATTERN = re.compile(r"Status\s*:\s*Failed", re.IGNORECASE)
 
 
 def main() -> None:
