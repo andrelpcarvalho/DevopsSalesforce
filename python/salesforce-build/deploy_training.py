@@ -25,6 +25,8 @@ def main() -> None:
         "--verbose",
     ]
 
+    # Output silencioso — grava apenas no log sem imprimir no terminal.
+    # O pipeline.py já exibe "[INFO] Training rodando em background".
     with (
         subprocess.Popen(
             cmd,
@@ -35,8 +37,7 @@ def main() -> None:
         LOG_TRAINING.open("w") as log,
     ):
         for line in proc.stdout:
-            print(line, end="")
-            log.write(line)
+            log.write(line)   # só grava no arquivo, sem print
 
     if proc.returncode != 0:
         print(f"[ERRO] Deploy em Training falhou com exit code {proc.returncode}.")

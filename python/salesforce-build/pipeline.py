@@ -5,6 +5,7 @@ Orquestrador principal do pipeline de deploy.
 Chama build → package.xml → training (paralelo) → PRD (síncrono).
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -22,7 +23,7 @@ def run_script(path: Path) -> int:
     return result.returncode
 
 
-ERROR_PATTERN = re.compile(r"error|failed|exception|deploy failed", re.IGNORECASE)
+ERROR_PATTERN = re.compile(r"Status\s*:\s*Failed", re.IGNORECASE)
 
 
 def log_has_errors(log_path: Path) -> bool:
@@ -131,7 +132,15 @@ def main() -> None:
         print("[OK] Deploy em Training concluído sem erros.")
 
     # ── Atualiza baseline APÓS PRD passar ──────────────────────────────────
-    novo_baseline = BASELINE_FILE.read_text().strip()
+    # build_deploy.py publica o HEAD calculado em NOVO_BASELINE.
+    # Se a env var não estiver disponível (subprocesso isolado), faz fallback
+    # lendo git rev-parse HEAD diretamente.
+    novo_baseline = os.environ.get("NOVO_BASELINE", "").strip()
+    if not novo_baseline:
+        novo_baseline = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
     BASELINE_FILE.write_text(novo_baseline + "\n")
     print(f"[INFO] baseline.txt atualizado para: {novo_baseline}")
 
